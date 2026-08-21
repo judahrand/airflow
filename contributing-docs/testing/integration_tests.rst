@@ -83,6 +83,8 @@ The following integrations are available.
 +---------------+-------------------------------------------------------+
 | opensearch    | Integration required for OpenSearch hooks.            |
 +---------------+-------------------------------------------------------+
+| oras          | Integration required for ORAS provider tests.         |
++---------------+-------------------------------------------------------+
 | otel          | Integration required for OTEL/opentelemetry hooks.    |
 +---------------+-------------------------------------------------------+
 | pinot         | Integration required for Apache Pinot hooks.          |

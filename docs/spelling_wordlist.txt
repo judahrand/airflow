@@ -730,6 +730,7 @@ getter
 getters
 gevent
 GH
+ghcr
 GiB
 gid
 gif
@@ -1173,6 +1174,7 @@ oauth
 objectORfile
 objectstorage
 observability
+OCI
 od
 odbc
 odps
@@ -1211,6 +1213,8 @@ OptIn
 optionality
 ora
 oracledb
+ORAS
+oras
 orchestrator
 orm
 os
@@ -1344,6 +1348,7 @@ pty
 PublisherClient
 Pubsub
 pubsub
+pullable
 pullrequest
 PutObject
 PVC
@@ -1459,6 +1464,7 @@ Roadmap
 roadmap
 roc
 RoleBinding
+rollout
 rollup
 rom
 romeoandjuliet
@@ -1549,6 +1555,8 @@ setMachineType
 SFN
 sftp
 SFTPClient
+sha
+sha512
 sharded
 Sharepoint
 shm
@@ -1705,6 +1713,7 @@ tablefmt
 tableId
 Tabular
 tagKey
+tagless
 tagValue
 targetColumn
 task_group
@@ -1824,6 +1833,7 @@ uncompress
 undeploy
 undeployed
 Undeploys
+unencrypted
 unicode
 unicodecsv
 unindent

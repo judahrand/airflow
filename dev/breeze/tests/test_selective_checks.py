@@ -3618,6 +3618,17 @@ def test_testable_providers_integrations_gated_by_affected_provider():
     assert "ydb" not in result
 
 
+def test_oras_provider_selects_only_oras_integration():
+    selective_checks = SelectiveChecks(
+        files=("providers/oras/src/airflow/providers/oras/hooks/oras.py",),
+        commit_ref=NEUTRAL_COMMIT,
+        github_event=GithubEvents.PULL_REQUEST,
+        platform=CI_AMD_PLATFORM,
+    )
+
+    assert selective_checks.testable_providers_integrations == ["oras"]
+
+
 def test_individual_providers_excludes_platform_excluded_on_arm():
     """ibm.mq declares `excluded-platforms: [linux/arm64]`, so it must be absent from
     the ARM individual-providers matrix (used by the Low-dep ARM canary job) and

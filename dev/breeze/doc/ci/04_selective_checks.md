@@ -222,6 +222,9 @@ When unit tests run, selective checks narrow *which* test types execute, separat
   dependents** (not the whole transitive closure). Changes to *common* provider code (tests/utils that
   don't belong to a single provider) escalate to *all* providers. Suspended providers are excluded (and
   a PR that touches one fails unless it carries the `allow suspended provider changes` label).
+* **Provider integrations**: outside full and canary runs, each Compose-backed provider integration is
+  selected only when its owning provider is affected. For example, a change under `providers/oras/`
+  selects the `oras` integration without selecting unrelated provider integrations.
 
 The same matched-file approach drives the **prek hook skip list** (`skip_prek_hooks`): each mypy /
 compile / lint hook is skipped when nothing in its area changed. See
@@ -441,6 +444,8 @@ together using `pytest-xdist` (pytest-xdist distributes the tests among parallel
     of affected providers (but not recursively - only direct dependencies are added)
   * if there are any changes to "common" provider code not belonging to any provider (usually system tests
     or tests), then tests for all Providers are run
+  * Compose-backed provider integrations are selected from those affected providers; for example,
+    provider `oras` owns integration `oras`
 * `OpenLineage E2E tests` (the `openlineage` mode of the deployed-stack tests under
   `airflow-e2e-tests/tests/airflow_e2e_tests/openlineage_tests`, exposed as the
   `run-openlineage-e2e-tests` output) run when the `openlineage` or `common` providers or the
@@ -607,7 +612,7 @@ GitHub Actions to pass the list of parameters to a command to execute
 | skip-providers-tests                                    | When provider tests should be skipped (on non-main branch or when no provider changes detected)         | true                                     |      |
 | sqlite-exclude                                          | Which versions of Sqlite to exclude for tests as JSON array                                             | []                                       |      |
 | testable-core-integrations                              | List of core integrations that are testable in the build as JSON array                                  | \['celery', 'kerberos'\]                 |      |
-| testable-providers-integrations                         | List of core integrations that are testable in the build as JSON array                                  | \['mongo', 'kafka'\]                     |      |
+| testable-providers-integrations                         | List of provider integrations selected for the build as JSON array                                      | \['oras'\]                               |      |
 | upgrade-to-newer-dependencies                           | Whether the image build should attempt to upgrade all dependencies (true/false or commit hash)          | false                                    |      |
 
 

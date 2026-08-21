@@ -156,6 +156,9 @@ fi
 if [[ ${INTEGRATION_REDIS} == "true" ]]; then
     check_service "Redis" "run_nc redis 6379" 50
 fi
+if [[ ${INTEGRATION_ORAS} == "true" ]]; then
+    check_service "ORAS registry" "run_nc oras-registry 5000" 50
+fi
 if [[ ${INTEGRATION_OTEL} == "true" ]]; then
     check_service "Jaeger" "run_nc jaeger 16686" 50
 fi

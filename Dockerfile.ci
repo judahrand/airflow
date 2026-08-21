@@ -68,6 +68,7 @@ PNPM_VERSION=${PNPM_VERSION:-10.28.1}
 RUSTUP_DEFAULT_TOOLCHAIN=${RUSTUP_DEFAULT_TOOLCHAIN:-stable}
 RUSTUP_VERSION=${RUSTUP_VERSION:-1.29.0}
 COSIGN_VERSION=${COSIGN_VERSION:-3.0.5}
+ORAS_VERSION=${ORAS_VERSION:-1.3.2}
 
 if [[ "${1}" == "runtime" ]]; then
     INSTALLATION_TYPE="RUNTIME"
@@ -488,6 +489,36 @@ function install_nodejs() {
     corepack prepare "pnpm@${PNPM_VERSION}" --activate
 }
 
+function install_oras() {
+    local arch
+    arch="$(dpkg --print-architecture)"
+    declare -A oras_targets=(
+        [amd64]="amd64"
+        [arm64]="arm64"
+    )
+    declare -A oras_sha256s=(
+        # https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_checksums.txt
+        [amd64]="9229ccc6d17bb282039ad4a69abb16dcb887a5bce567c075d731d9b3c7ad8eaf"
+        [arm64]="8db4a223bd6034deff198e791ea7cb3af0840df25b7e9f370e2f1f3fd20d389b"
+    )
+    local target="${oras_targets[${arch}]:-}"
+    local oras_sha256="${oras_sha256s[${arch}]:-}"
+    if [[ -z "${target}" || -z "${oras_sha256}" ]]; then
+        echo "Unsupported architecture for oras: ${arch}"
+        exit 1
+    fi
+    local oras_archive="/tmp/oras.tar.gz"
+    local oras_extract_dir
+    oras_extract_dir="$(mktemp -d)"
+    curl -fsSL --retry 3 --retry-delay 5 \
+        "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_${target}.tar.gz" \
+        -o "${oras_archive}"
+    echo "${oras_sha256}  ${oras_archive}" | sha256sum --check
+    tar -xzf "${oras_archive}" -C "${oras_extract_dir}" oras
+    install -m 0755 "${oras_extract_dir}/oras" /usr/local/bin/oras
+    rm -rf "${oras_extract_dir}" "${oras_archive}"
+}
+
 function install_rustup() {
     local arch
     arch="$(dpkg --print-architecture)"
@@ -535,6 +566,7 @@ else
         install_golang
         install_jdk
         install_nodejs
+        install_oras
     fi
     install_docker_cli
     apt_clean

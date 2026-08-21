@@ -80,16 +80,17 @@ apache-airflow-helm-chart = false
 apache-airflow-providers-anthropic = false
 apache-airflow-providers-common-io = false
 apache-airflow-providers-cohere = false
+apache-airflow-providers-oras = false
 apache-airflow-providers-pinecone = false
-apache-airflow-providers-segment = false
 apache-airflow-providers-redis = false
-apache-airflow-shared-dagnode = false
+apache-airflow-providers-segment = false
 apache-airflow-providers-apache-pinot = false
 apache-airflow-providers-weaviate = false
-google-cloud-aiplatform = "2026-08-13T00:00:00Z"
+apache-airflow-shared-dagnode = false
 apache-airflow-providers-akeyless = false
 apache-airflow-providers-salesforce = false
 apache-airflow-providers-ssh = false
+google-cloud-aiplatform = "2026-08-13T00:00:00Z"
 apache-airflow-providers-papermill = false
 apache-airflow-providers-google = false
 pydantic-ai-skills = "2026-07-16T00:00:00Z"
@@ -257,6 +258,7 @@ members = [
     "apache-airflow-providers-opensearch",
     "apache-airflow-providers-opsgenie",
     "apache-airflow-providers-oracle",
+    "apache-airflow-providers-oras",
     "apache-airflow-providers-pagerduty",
     "apache-airflow-providers-papermill",
     "apache-airflow-providers-pgvector",
@@ -7018,6 +7020,41 @@ dev = [
     { name = "numpy", marker = "python_full_version == '3.12.*'", specifier = ">=1.26.0" },
     { name = "numpy", marker = "python_full_version == '3.13.*'", specifier = ">=2.1.0" },
     { name = "numpy", marker = "python_full_version >= '3.14'", specifier = ">=2.4.3" },
+]
+docs = [{ name = "apache-airflow-devel-common", extras = ["docs"], editable = "devel-common" }]
+
+[[package]]
+name = "apache-airflow-providers-oras"
+version = "0.1.0"
+source = { editable = "providers/oras" }
+dependencies = [
+    { name = "apache-airflow" },
+    { name = "apache-airflow-providers-common-compat" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "apache-airflow" },
+    { name = "apache-airflow-devel-common" },
+    { name = "apache-airflow-providers-common-compat" },
+    { name = "apache-airflow-task-sdk" },
+]
+docs = [
+    { name = "apache-airflow-devel-common", extra = ["docs"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "apache-airflow", editable = "." },
+    { name = "apache-airflow-providers-common-compat", editable = "providers/common/compat" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "apache-airflow", editable = "." },
+    { name = "apache-airflow-devel-common", editable = "devel-common" },
+    { name = "apache-airflow-providers-common-compat", editable = "providers/common/compat" },
+    { name = "apache-airflow-task-sdk", editable = "task-sdk" },
 ]
 docs = [{ name = "apache-airflow-devel-common", extras = ["docs"], editable = "devel-common" }]
 
