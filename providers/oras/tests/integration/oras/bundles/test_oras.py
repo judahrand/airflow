@@ -62,6 +62,7 @@ class PublishedBundle:
     repository: str
     reference: str
     digest: str
+    dag_files: dict[str, str]
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -175,9 +176,13 @@ def publish_with_oras(
         f"{_REGISTRY_AUTHORITY}/{_REPOSITORY_NAME}:{reference}",
         source.name,
     ]
+    return run_oras_publish(command, cwd=source.parent)
+
+
+def run_oras_publish(command: list[str], *, cwd: Path | None = None) -> str:
     result = subprocess.run(
         command,
-        cwd=source.parent,
+        cwd=cwd,
         check=False,
         capture_output=True,
         text=True,
@@ -187,7 +192,7 @@ def publish_with_oras(
         pytest.fail(f"ORAS failed to publish the integration artifact:\n{output}")
     match = re.search(r"Digest:\s+(sha(?:256|512):[0-9a-f]+)", output)
     if match is None or not is_digest(match.group(1)):
-        pytest.fail(f"ORAS push did not return a supported manifest digest:\n{output}")
+        pytest.fail(f"ORAS did not return a supported manifest digest:\n{output}")
     return match.group(1)
 
 
@@ -200,10 +205,62 @@ def published_bundle(
         bundle_source,
         reference=_REFERENCE,
     )
-    return PublishedBundle(repository=repository, reference=_REFERENCE, digest=digest)
+    return PublishedBundle(
+        repository=repository,
+        reference=_REFERENCE,
+        digest=digest,
+        dag_files={_DAG_ID: "example_project/dags/integration.py"},
+    )
+
+
+@pytest.fixture(scope="session")
+def published_index(
+    published_bundle: PublishedBundle,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> PublishedBundle:
+    second_dag_id = "oci_bundle_index_second"
+    second_source = build_dag_source(
+        tmp_path_factory.mktemp("oci-index-bundle"),
+        filename="second.py",
+        dag_id=second_dag_id,
+        package_name="second_project",
+    )
+    second_digest = publish_with_oras(second_source, reference="index-second")
+    repository = published_bundle.repository
+    reference = "integration-index"
+    digest = run_oras_publish(
+        [
+            "oras",
+            "manifest",
+            "index",
+            "create",
+            "--plain-http",
+            f"{repository}:{reference}",
+            published_bundle.digest,
+            second_digest,
+        ]
+    )
+    dag_files = {**published_bundle.dag_files, second_dag_id: "second_project/dags/second.py"}
+    return PublishedBundle(repository=repository, reference=reference, digest=digest, dag_files=dag_files)
 
 
 def test_oras_hook_resolves_and_pulls_published_bundle_artifact(
+    tmp_path: Path,
+    published_bundle: PublishedBundle,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    check_oras_hook_resolves_and_pulls_bundle(tmp_path, published_bundle, monkeypatch)
+
+
+def test_oras_hook_resolves_and_pulls_index_with_multiple_artifacts(
+    tmp_path: Path,
+    published_index: PublishedBundle,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    check_oras_hook_resolves_and_pulls_bundle(tmp_path, published_index, monkeypatch)
+
+
+def check_oras_hook_resolves_and_pulls_bundle(
     tmp_path: Path,
     published_bundle: PublishedBundle,
     monkeypatch: pytest.MonkeyPatch,
@@ -222,11 +279,28 @@ def test_oras_hook_resolves_and_pulls_published_bundle_artifact(
     hook.pull(tagged_digest, pulled)
 
     assert digest == published_bundle.digest
-    assert (pulled / "example_project" / "dags" / "integration.py").is_file()
-    assert (pulled / "example_project" / "shared").is_dir()
+    for relative_path in published_bundle.dag_files.values():
+        assert (pulled / relative_path).is_file()
+        assert ((pulled / relative_path).parents[1] / "shared").is_dir()
 
 
 def test_airflow_loads_and_parses_the_configured_oci_bundle(
+    tmp_path: Path,
+    published_bundle: PublishedBundle,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    check_airflow_loads_and_parses_bundle(tmp_path, published_bundle, monkeypatch)
+
+
+def test_airflow_loads_and_parses_index_with_multiple_artifacts(
+    tmp_path: Path,
+    published_index: PublishedBundle,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    check_airflow_loads_and_parses_bundle(tmp_path, published_index, monkeypatch)
+
+
+def check_airflow_loads_and_parses_bundle(
     tmp_path: Path,
     published_bundle: PublishedBundle,
     monkeypatch: pytest.MonkeyPatch,
@@ -282,16 +356,30 @@ def test_airflow_loads_and_parses_the_configured_oci_bundle(
         assert restarted.path.stat().st_mtime_ns == materialized_mtime
         assert (restarted.tracking_path / "manifest-digest").read_text() == published_bundle.digest
 
-        dag_file = bundle.path / "example_project" / "dags" / "integration.py"
-        dag_bag = load_bundle_dag_bag(
-            dag_file=dag_file,
-            bundle_path=bundle.path,
-            bundle_name=bundle.name,
-        )
+        worker_bundle = manager.get_bundle(_BUNDLE_NAME, version=version)
+        worker_bundle.initialize()
+        worker_version, worker_version_data = unpack_current_version(worker_bundle)
 
-        assert dag_bag.import_errors == {}
-        assert dag_bag.dag_ids == [_DAG_ID]
-        assert dag_bag.dags[_DAG_ID].relative_fileloc == "example_project/dags/integration.py"
+        assert worker_version == published_bundle.digest
+        assert worker_version_data is None
+        assert worker_bundle.path == storage / _BUNDLE_NAME / "versions" / version / "content"
+
+        for materialization in (bundle, worker_bundle):
+            dag_bag = load_bundle_dag_bag(
+                dag_file=materialization.path,
+                bundle_path=materialization.path,
+                bundle_name=materialization.name,
+            )
+
+            assert dag_bag.import_errors == {}
+            assert set(dag_bag.dag_ids) == set(published_bundle.dag_files)
+            for dag_id, relative_path in published_bundle.dag_files.items():
+                assert dag_bag.dags[dag_id].relative_fileloc == relative_path
+
+        assert {
+            path.relative_to(worker_bundle.path): path.read_bytes()
+            for path in worker_bundle.path.rglob("*.py")
+        } == {path.relative_to(bundle.path): path.read_bytes() for path in bundle.path.rglob("*.py")}
 
 
 def test_airflow_loads_an_immutable_version_after_its_tag_moves(
